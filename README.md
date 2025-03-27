@@ -22,10 +22,7 @@ This is a BitTorrent client made in Node.js
    ```bash
    git clone https://github.com/x20surya/BitTorrentClient.git
 
-2. Navigate to the project directory:
-
-    ```bash
-    cd bittorrent-client
+2. Navigate to the project directory
 
 3. Install dependencies:
 
