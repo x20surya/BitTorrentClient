@@ -13,6 +13,10 @@ import Pieces from "./pieces.js";
 import Queue from "./Queue.js";
 import { closeSync, openSync, write } from "fs";
 
+import cliProgress from "cli-progress";
+
+const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
+
 export default (torrent, path) => {
   getPeers(torrent, (peers) => {
     const pieces = new Pieces(torrent);
@@ -121,7 +125,15 @@ function bitfieldHandler(socket, pieces, queue, payload) {
   if (queueEmpty) requestPiece(socket, pieces, queue);
 }
 
+let pieceHandlerStarted = false;
+
 function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
+  if (!pieceHandlerStarted) {
+    bar1.start(100, 0, {
+      speed: "N/A",
+    });
+    pieceHandlerStarted = true;
+  }
   //   console.log(pieceResp);
   pieces.addReceived(pieceResp);
 
@@ -131,7 +143,9 @@ function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
   write(file, pieceResp.block, 0, pieceResp.block.length, offset, () => {});
 
   if (pieces.isDone()) {
-    console.log("---------------DONE!---------------------");
+    bar1.update(100);
+    // console.log("---------------DONE!---------------------");
+
     socket.end();
     try {
       closeSync(file);
@@ -140,13 +154,16 @@ function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
       console.log(e);
     }
   } else {
-    process.stdout.write(
-      `downloading... ${(
-        (pieces.totalReceivedBlocks / pieces.totalBlocks) *
-        100
-      ).toPrecision(3)}%`
+    bar1.update(
+      Math.ceil((pieces.totalReceivedBlocks / pieces.totalBlocks) * 100)
     );
-    process.stdout.cursorTo(0);
+    // process.stdout.write(
+    //   `downloading... ${(
+    //     (pieces.totalReceivedBlocks / pieces.totalBlocks) *
+    //     100
+    //   ).toPrecision(3)}%`
+    // );
+    // process.stdout.cursorTo(0);
     requestPiece(socket, pieces, queue);
   }
 }
