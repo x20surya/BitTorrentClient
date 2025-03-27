@@ -8,7 +8,7 @@ This is a BitTorrent client made in Node.js
 
 ## Future Features
 
-- **UI Interface made with Tauri**
+- **UI Interface made with Tauri/electron.js**
 - **Multiple File torrent support**
 
 ## Prerequisites
