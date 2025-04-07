@@ -4,12 +4,12 @@ This is a BitTorrent client made in Node.js
 
 ## Current Features
 
-- **Can download single file torrents** 
+- **Can download multiple file torrents** 
+- **With Proper File Structure**
 
 ## Future Features
 
 - **UI Interface made with Tauri/electron.js**
-- **Multiple File torrent support**
 
 ## Prerequisites
 
