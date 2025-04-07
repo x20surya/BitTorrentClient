@@ -6,10 +6,12 @@ This is a BitTorrent client made in Node.js
 
 - **Can download multiple file torrents** 
 - **With Proper File Structure**
+- **Checks all trackers sequentially**
 
 ## Future Features
 
 - **UI Interface made with Tauri/electron.js**
+- **Better speeds using better algorithms**
 
 ## Prerequisites
 
