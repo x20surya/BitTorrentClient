@@ -11,7 +11,7 @@ import {
 } from "./message.js";
 import Pieces from "./pieces.js";
 import Queue from "./Queue.js";
-import { closeSync, openSync, write } from "fs";
+import { closeSync, existsSync, mkdirSync, openSync, write } from "fs";
 
 import cliProgress from "cli-progress";
 
@@ -20,12 +20,67 @@ const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 export default (torrent, path) => {
   getPeers(torrent, (peers) => {
     const pieces = new Pieces(torrent);
-    const file = openSync(path, "w");
-    peers.forEach((peer) => download(peer, torrent, pieces, file));
+
+    mkdirSync(path, (err) => {
+      console.log(err);
+      return;
+    });
+
+    const pathInString = new TextDecoder().decode(path);
+
+    const files = initializeFiles(torrent, path);
+    console.log(files);
+    files.forEach((file) => {
+      if (file.path.length > 1) {
+        mkdirRecurssive(0, file.path);
+      }
+      file.descriptor = openSync(`${pathInString}/${file.path.join("/")}`, "w");
+    });
+
+    function mkdirRecurssive(n, path) {
+      if (n + 1 == path.length) {
+        return;
+      } else {
+        const newarr = path.slice(0, n + 1);
+        if (!existsSync(`${pathInString}/${newarr.join("/")}`)) {
+          mkdirSync(`${pathInString}/${newarr.join("/")}`, (err) => {
+            console.log(err);
+          });
+        }
+        mkdirRecurssive(n + 1, path);
+      }
+    }
+
+    peers.forEach((peer) => download(peer, torrent, pieces, files));
   });
 };
 
-function download(peer, torrent, pieces, file) {
+function initializeFiles(torrent, path) {
+  const files = [];
+  const nFiles = torrent.info.files.length;
+
+  let offset = 0;
+  for (let i = 0; i < nFiles; i++) {
+    const fileLength = torrent.info.files[i].length;
+    const decoder = new TextDecoder();
+    const filePath = torrent.info.files[i].path.map((item) =>
+      decoder.decode(item)
+    );
+
+    files.push({
+      length: fileLength,
+      path: filePath,
+      descriptor: null,
+      offset: offset,
+    });
+
+    offset += Math.floor(fileLength / torrent.info["piece length"]);
+  }
+
+  return files;
+}
+
+function download(peer, torrent, pieces, files) {
   const socket = new net.Socket();
   socket.on("error", (e) => {});
   socket.connect(peer.port, peer.ip, () => {
@@ -33,7 +88,7 @@ function download(peer, torrent, pieces, file) {
   });
   const queue = new Queue(torrent);
   onWholeMessage(socket, (msg) =>
-    msgHandler(msg, socket, pieces, queue, torrent, file)
+    msgHandler(msg, socket, pieces, queue, torrent, files)
   );
 }
 
@@ -58,7 +113,7 @@ function onWholeMessage(socket, callback) {
   });
 }
 
-function msgHandler(msg, socket, pieces, queue, torrent, file) {
+function msgHandler(msg, socket, pieces, queue, torrent, files) {
   if (isHandshake(msg)) {
     socket.write(buildInterested());
   } else {
@@ -82,7 +137,7 @@ function msgHandler(msg, socket, pieces, queue, torrent, file) {
         break;
       }
       case 7: {
-        pieceHandler(socket, pieces, queue, torrent, file, m.payload);
+        pieceHandler(socket, pieces, queue, torrent, files, m.payload);
         break;
       }
     }
@@ -127,7 +182,7 @@ function bitfieldHandler(socket, pieces, queue, payload) {
 
 let pieceHandlerStarted = false;
 
-function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
+function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
   if (!pieceHandlerStarted) {
     bar1.start(100, 0, {
       speed: "N/A",
@@ -135,12 +190,27 @@ function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
     pieceHandlerStarted = true;
   }
   //   console.log(pieceResp);
+  const fileIndex = findFileIndex(torrent, files, pieceResp.index);
+
+  const file = files[fileIndex];
+
+  const relativePieceIndex = pieceResp.index - file.offset;
+
   pieces.addReceived(pieceResp);
 
   const offset =
-    pieceResp.index * torrent.info["piece length"] + pieceResp.begin;
+    file.offset +
+    relativePieceIndex * torrent.info["piece length"] +
+    pieceResp.begin;
 
-  write(file, pieceResp.block, 0, pieceResp.block.length, offset, () => {});
+  write(
+    file.descriptor,
+    pieceResp.block,
+    0,
+    pieceResp.block.length,
+    offset,
+    () => {}
+  );
 
   if (pieces.isDone()) {
     bar1.update(100);
@@ -148,7 +218,7 @@ function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
 
     socket.end();
     try {
-      closeSync(file);
+      closeSync(file.descriptor);
       process.exit(0);
     } catch (e) {
       console.log(e);
@@ -157,15 +227,25 @@ function pieceHandler(socket, pieces, queue, torrent, file, pieceResp) {
     bar1.update(
       Math.ceil((pieces.totalReceivedBlocks / pieces.totalBlocks) * 100)
     );
-    // process.stdout.write(
-    //   `downloading... ${(
-    //     (pieces.totalReceivedBlocks / pieces.totalBlocks) *
-    //     100
-    //   ).toPrecision(3)}%`
-    // );
-    // process.stdout.cursorTo(0);
     requestPiece(socket, pieces, queue);
   }
+}
+
+function findFileIndex(torrent, files, pieceIndex) {
+  let offset = 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const piecesInFile = Math.ceil(file.length / torrent.info["piece length"]);
+
+    if (pieceIndex < offset + piecesInFile) {
+      return i;
+    }
+
+    offset += piecesInFile;
+  }
+
+  return -1; // error: piece index does not correspond to any file
 }
 
 function requestPiece(socket, pieces, queue) {

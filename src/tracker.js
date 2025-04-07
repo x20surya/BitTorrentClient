@@ -9,14 +9,8 @@ import { genId } from "./util.js";
 
 export const getPeers = (torrent, callback) => {
   const socket = dgram.createSocket("udp4");
+  // const url = new URL(new TextDecoder().decode(torrent.announce));
   const url = new URL(new TextDecoder().decode(torrent.announce));
-
-  // 1. send connect request
-  //   torrent["announce-list"].forEach((element) => {
-  //     const url = element[0];
-  //     console.log(url);
-  //     udpSend(socket, buildConnReq(), "udp://tracker.opentrackr.org:1337/announce");
-  //   });
 
   udpSend(socket, buildConnReq(), url);
 
