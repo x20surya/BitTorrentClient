@@ -1,12 +1,12 @@
 "use strict";
 
-import { readFileSync } from "fs";
+import fs from "fs";
 import bencode from "bencode";
 import { createHash } from "crypto";
 import { toBigIntBE, toBufferBE } from "bigint-buffer";
 
 export function open(filepath) {
-  return bencode.decode(readFileSync(filepath));
+  return bencode.decode(fs.readFileSync(filepath));
 }
 
 export function size(torrent) {

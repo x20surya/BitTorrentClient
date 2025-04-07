@@ -2,26 +2,21 @@
 
 import net from "net";
 import { Buffer } from "buffer";
-import { getPeers } from "./tracker.js";
-import {
-  buildHandShake,
-  buildInterested,
-  buildRequest,
-  parse,
-} from "./message.js";
+import * as tracker from "./tracker.js";
+import * as message from "./message.js";
 import Pieces from "./pieces.js";
 import Queue from "./Queue.js";
-import { closeSync, existsSync, mkdirSync, openSync, write } from "fs";
+import fs from "fs";
 
 import cliProgress from "cli-progress";
 
 const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
 export default (torrent, path) => {
-  getPeers(torrent, (peers) => {
+  tracker.getPeers(torrent, (peers) => {
     const pieces = new Pieces(torrent);
 
-    mkdirSync(path, (err) => {
+    fs.mkdirSync(path, (err) => {
       console.log(err);
       return;
     });
@@ -34,7 +29,7 @@ export default (torrent, path) => {
       if (file.path.length > 1) {
         mkdirRecurssive(0, file.path);
       }
-      file.descriptor = openSync(`${pathInString}/${file.path.join("/")}`, "w");
+      file.descriptor = fs.openSync(`${pathInString}/${file.path.join("/")}`, "w");
     });
 
     function mkdirRecurssive(n, path) {
@@ -42,8 +37,8 @@ export default (torrent, path) => {
         return;
       } else {
         const newarr = path.slice(0, n + 1);
-        if (!existsSync(`${pathInString}/${newarr.join("/")}`)) {
-          mkdirSync(`${pathInString}/${newarr.join("/")}`, (err) => {
+        if (!fs.existsSync(`${pathInString}/${newarr.join("/")}`)) {
+          fs.mkdirSync(`${pathInString}/${newarr.join("/")}`, (err) => {
             console.log(err);
           });
         }
@@ -84,7 +79,7 @@ function download(peer, torrent, pieces, files) {
   const socket = new net.Socket();
   socket.on("error", (e) => {});
   socket.connect(peer.port, peer.ip, () => {
-    socket.write(buildHandShake(torrent));
+    socket.write(message.buildHandShake(torrent));
   });
   const queue = new Queue(torrent);
   onWholeMessage(socket, (msg) =>
@@ -115,9 +110,9 @@ function onWholeMessage(socket, callback) {
 
 function msgHandler(msg, socket, pieces, queue, torrent, files) {
   if (isHandshake(msg)) {
-    socket.write(buildInterested());
+    socket.write(message.buildInterested());
   } else {
-    const m = parse(msg);
+    const m = message.parse(msg);
 
     switch (m.id) {
       case 0: {
@@ -203,7 +198,7 @@ function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
     relativePieceIndex * torrent.info["piece length"] +
     pieceResp.begin;
 
-  write(
+  fs.write(
     file.descriptor,
     pieceResp.block,
     0,
@@ -218,7 +213,7 @@ function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
 
     socket.end();
     try {
-      closeSync(file.descriptor);
+      fs.closeSync(file.descriptor);
       process.exit(0);
     } catch (e) {
       console.log(e);
@@ -254,7 +249,7 @@ function requestPiece(socket, pieces, queue) {
   while (queue.length()) {
     const pieceBlock = queue.deque();
     if (pieces.needed(pieceBlock)) {
-      socket.write(buildRequest(pieceBlock));
+      socket.write(message.buildRequest(pieceBlock));
       pieces.addRequested(pieceBlock);
       break;
     }

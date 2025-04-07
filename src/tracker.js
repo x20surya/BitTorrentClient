@@ -4,8 +4,8 @@ import dgram from "dgram";
 import { Buffer } from "buffer";
 import { URL } from "url";
 import { randomBytes } from "crypto";
-import { infoHash, size } from "./torrent-parser.js";
-import { genId } from "./util.js";
+import * as torrentParser from "./torrent-parser.js";
+import * as util from "./util.js";
 
 export const getPeers = (torrent, callback) => {
   const socket = dgram.createSocket("udp4");
@@ -28,7 +28,7 @@ export const getPeers = (torrent, callback) => {
       // 4. parse announce response
       const announceResp = parseAnnounceResp(response);
       console.log(
-        `\n----------------received no of peers ${announceResp.nPeers} --------------\n`
+        `\n----------------received no of peers : ${announceResp.nPeers} --------------\n`
       );
       // 5. pass peers to callback
       callback(announceResp.peers);
@@ -85,13 +85,13 @@ function buildAnnounceReq(connId, torrent, port = 6881) {
   //transaction id
   randomBytes(4).copy(buf, 12);
   // info hash
-  infoHash(torrent).copy(buf, 16);
+  torrentParser.infoHash(torrent).copy(buf, 16);
   // peer Id
-  genId().copy(buf, 36);
+  util.genId().copy(buf, 36);
   // download
   Buffer.alloc(8).copy(buf, 56);
   // left
-  size(torrent).copy(buf, 64);
+  torrentParser.size(torrent).copy(buf, 64);
   // uploaded
   Buffer.alloc(8).copy(buf, 72);
   //event
