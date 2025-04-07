@@ -24,8 +24,8 @@ export default (torrent, path) => {
     const pathInString = new TextDecoder().decode(path);
 
     const files = initializeFiles(torrent, path);
-    console.log(files);
     files.forEach((file) => {
+      console.log(file.path.join("/"))
       if (file.path.length > 1) {
         mkdirRecurssive(0, file.path);
       }
