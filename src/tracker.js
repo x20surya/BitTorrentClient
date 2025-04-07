@@ -6,34 +6,67 @@ import { URL } from "url";
 import { randomBytes } from "crypto";
 import * as torrentParser from "./torrent-parser.js";
 import * as util from "./util.js";
+import { resolve } from "path";
 
-export const getPeers = (torrent, callback) => {
-  const socket = dgram.createSocket("udp4");
-  // const url = new URL(new TextDecoder().decode(torrent.announce));
-  const url = new URL(new TextDecoder().decode(torrent.announce));
+export const getPeers = async (torrent, callback) => {
 
-  udpSend(socket, buildConnReq(), url);
+  const decoder = new TextDecoder();
+  const trackers = [];
 
-  socket.on("message", (response) => {
-    if (respType(response) === "connect") {
-      // 2. recieve and parse connect response
-      const connResp = parseConnResp(response);
-      console.log(
-        "\n--------------- received connect response from tracker! -----------\n"
-      );
-      // 3. send announce request
-      const announceReq = buildAnnounceReq(connResp.connectionId, torrent);
-      udpSend(socket, announceReq, url);
-    } else if (respType(response) === "announce") {
-      // 4. parse announce response
-      const announceResp = parseAnnounceResp(response);
-      console.log(
-        `\n----------------received no of peers : ${announceResp.nPeers} --------------\n`
-      );
-      // 5. pass peers to callback
-      callback(announceResp.peers);
+  trackers.push(new URL(decoder.decode(torrent.announce)));
+
+  torrent["announce-list"].forEach((announce) => {
+    const url = new URL(decoder.decode(announce[0]));
+    if (url.protocol === "udp:") {
+      trackers.push(url);
     }
   });
+
+  for (let i = 0; i < trackers.length; i++) {
+    try {
+      const peers = await attemptTracker(trackers[i], torrent);
+      if(peers && peers.length) {
+        callback(peers);
+        return;
+      }
+    } catch (err) {
+      console.log(`No response from tracker ${trackers[i].href}: ${err.message}`)
+    }
+  }
+
+  function attemptTracker(trackerUrl, torrent) {
+    return new Promise((resolve, reject) => {
+      const socket = dgram.createSocket("udp4");
+      let responded = false;
+
+      const timeout = setTimeout(() => {
+        if(!responded) {
+          socket.close()
+          reject(new Error("Tracker did not responde in "))
+        }
+      }, 5000)
+
+      socket.on("message", (response) => {
+        if (!responded) {
+          const type = respType(response);
+          if (type === "connect") {
+            const connResp = parseConnResp(response);
+            const announceReq = buildAnnounceReq(connResp.connectionId, torrent);
+            udpSend(socket, announceReq, trackerUrl);
+          } else if (type === "announce") {
+            responded = true;
+            clearTimeout(timeout);
+            const announceResp = parseAnnounceResp(response);
+            resolve(announceResp.peers);
+            socket.close();
+          }
+        }
+      });
+
+      udpSend(socket, buildConnReq(), trackerUrl);
+    })
+  }
+
 };
 
 function udpSend(socket, message, rawUrl, callback = (err) => console.log) {
