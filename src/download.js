@@ -214,7 +214,6 @@ function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
     socket.end();
     try {
       fs.closeSync(file.descriptor);
-      process.exit(0);
     } catch (e) {
       console.log(e);
     }
