@@ -7,10 +7,10 @@ This is a BitTorrent client made in Node.js
 - **Can download multiple file torrents** 
 - **With Proper File Structure**
 - **Checks all trackers sequentially**
+- **UI Interface made with electron.js**
 
 ## Future Features
 
-- **UI Interface made with Tauri/electron.js**
 - **Better speeds using better algorithms**
 
 ## Prerequisites
@@ -36,12 +36,7 @@ This is a BitTorrent client made in Node.js
 - Run the BitTorrent client with the following command:
   
     ```bash
-    node index.js <path-to-torrent-file-to-download>
-
-- Example (A torrent file is included for testing)
-
-    ```bash
-    node index.js example.torrent
+    npm start
 
 ## Acknowledgments
 Inspired by the blog post by Allen Kim: ["How to Make Your Own BitTorrent Client"](https://allenkim67.github.io/programming/2016/05/04/how-to-make-your-own-bittorrent-client.html)
