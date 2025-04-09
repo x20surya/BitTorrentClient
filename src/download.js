@@ -12,24 +12,23 @@ import cliProgress from "cli-progress";
 
 const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
 
-export default (torrent, path) => {
+export default (torrent, path, destPath) => {
   tracker.getPeers(torrent, (peers) => {
     const pieces = new Pieces(torrent);
+    const pathInString = new TextDecoder().decode(path);
 
-    fs.mkdirSync(path, (err) => {
+    fs.mkdirSync(`${destPath}/${pathInString}`, (err) => {
       console.log(err);
       return;
     });
 
-    const pathInString = new TextDecoder().decode(path);
-
-    const files = initializeFiles(torrent, path);
+    const files = initializeFiles(torrent);
     files.forEach((file) => {
       console.log(file.path.join("/"))
       if (file.path.length > 1) {
         mkdirRecurssive(0, file.path);
       }
-      file.descriptor = fs.openSync(`${pathInString}/${file.path.join("/")}`, "w");
+      file.descriptor = fs.openSync(`${destPath}/${pathInString}/${file.path.join("/")}`, "w");
     });
 
     function mkdirRecurssive(n, path) {
@@ -37,8 +36,8 @@ export default (torrent, path) => {
         return;
       } else {
         const newarr = path.slice(0, n + 1);
-        if (!fs.existsSync(`${pathInString}/${newarr.join("/")}`)) {
-          fs.mkdirSync(`${pathInString}/${newarr.join("/")}`, (err) => {
+        if (!fs.existsSync(`${destPath}/${pathInString}/${newarr.join("/")}`)) {
+          fs.mkdirSync(`${destPath}/${pathInString}/${newarr.join("/")}`, (err) => {
             console.log(err);
           });
         }
@@ -50,7 +49,7 @@ export default (torrent, path) => {
   });
 };
 
-function initializeFiles(torrent, path) {
+function initializeFiles(torrent) {
   const files = [];
   const nFiles = torrent.info.files.length;
 
