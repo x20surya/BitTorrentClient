@@ -3,7 +3,7 @@
 import fs from "fs";
 import bencode from "bencode";
 import { createHash } from "crypto";
-import { toBigIntBE, toBufferBE } from "bigint-buffer";
+import { toBigIntBE, toBufferBE } from "@trufflesuite/bigint-buffer";
 
 export function open(filepath) {
   return bencode.decode(fs.readFileSync(filepath));
