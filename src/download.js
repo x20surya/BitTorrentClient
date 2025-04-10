@@ -8,11 +8,7 @@ import Pieces from "./pieces.js";
 import Queue from "./Queue.js";
 import fs from "fs";
 
-import cliProgress from "cli-progress";
-
-const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.shades_classic);
-
-export default (torrent, path, destPath) => {
+export default (torrent, path, destPath, progress) => {
   tracker.getPeers(torrent, (peers) => {
     const pieces = new Pieces(torrent);
     const pathInString = new TextDecoder().decode(path);
@@ -24,11 +20,14 @@ export default (torrent, path, destPath) => {
 
     const files = initializeFiles(torrent);
     files.forEach((file) => {
-      console.log(file.path.join("/"))
+      console.log(file.path.join("/"));
       if (file.path.length > 1) {
         mkdirRecurssive(0, file.path);
       }
-      file.descriptor = fs.openSync(`${destPath}/${pathInString}/${file.path.join("/")}`, "w");
+      file.descriptor = fs.openSync(
+        `${destPath}/${pathInString}/${file.path.join("/")}`,
+        "w"
+      );
     });
 
     function mkdirRecurssive(n, path) {
@@ -37,15 +36,18 @@ export default (torrent, path, destPath) => {
       } else {
         const newarr = path.slice(0, n + 1);
         if (!fs.existsSync(`${destPath}/${pathInString}/${newarr.join("/")}`)) {
-          fs.mkdirSync(`${destPath}/${pathInString}/${newarr.join("/")}`, (err) => {
-            console.log(err);
-          });
+          fs.mkdirSync(
+            `${destPath}/${pathInString}/${newarr.join("/")}`,
+            (err) => {
+              console.log(err);
+            }
+          );
         }
         mkdirRecurssive(n + 1, path);
       }
     }
 
-    peers.forEach((peer) => download(peer, torrent, pieces, files));
+    peers.forEach((peer) => download(peer, torrent, pieces, files, progress));
   });
 };
 
@@ -74,7 +76,7 @@ function initializeFiles(torrent) {
   return files;
 }
 
-function download(peer, torrent, pieces, files) {
+function download(peer, torrent, pieces, files, progress) {
   const socket = new net.Socket();
   socket.on("error", (e) => {});
   socket.connect(peer.port, peer.ip, () => {
@@ -82,7 +84,7 @@ function download(peer, torrent, pieces, files) {
   });
   const queue = new Queue(torrent);
   onWholeMessage(socket, (msg) =>
-    msgHandler(msg, socket, pieces, queue, torrent, files)
+    msgHandler(msg, socket, pieces, queue, torrent, files, progress)
   );
 }
 
@@ -107,7 +109,7 @@ function onWholeMessage(socket, callback) {
   });
 }
 
-function msgHandler(msg, socket, pieces, queue, torrent, files) {
+function msgHandler(msg, socket, pieces, queue, torrent, files, progress) {
   if (isHandshake(msg)) {
     socket.write(message.buildInterested());
   } else {
@@ -131,7 +133,15 @@ function msgHandler(msg, socket, pieces, queue, torrent, files) {
         break;
       }
       case 7: {
-        pieceHandler(socket, pieces, queue, torrent, files, m.payload);
+        pieceHandler(
+          socket,
+          pieces,
+          queue,
+          torrent,
+          files,
+          m.payload,
+          progress
+        );
         break;
       }
     }
@@ -174,15 +184,15 @@ function bitfieldHandler(socket, pieces, queue, payload) {
   if (queueEmpty) requestPiece(socket, pieces, queue);
 }
 
-let pieceHandlerStarted = false;
-
-function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
-  if (!pieceHandlerStarted) {
-    bar1.start(100, 0, {
-      speed: "N/A",
-    });
-    pieceHandlerStarted = true;
-  }
+function pieceHandler(
+  socket,
+  pieces,
+  queue,
+  torrent,
+  files,
+  pieceResp,
+  progress
+) {
   //   console.log(pieceResp);
   const fileIndex = findFileIndex(torrent, files, pieceResp.index);
 
@@ -207,9 +217,8 @@ function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
   );
 
   if (pieces.isDone()) {
-    bar1.update(100);
     // console.log("---------------DONE!---------------------");
-
+    progress(100);
     socket.end();
     try {
       fs.closeSync(file.descriptor);
@@ -217,9 +226,10 @@ function pieceHandler(socket, pieces, queue, torrent, files, pieceResp) {
       console.log(e);
     }
   } else {
-    bar1.update(
-      Math.ceil((pieces.totalReceivedBlocks / pieces.totalBlocks) * 100)
+    const percentageDone = Math.ceil(
+      (pieces.totalReceivedBlocks / pieces.totalBlocks) * 100
     );
+    progress(percentageDone);
     requestPiece(socket, pieces, queue);
   }
 }

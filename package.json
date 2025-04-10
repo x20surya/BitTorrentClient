@@ -15,7 +15,6 @@
   "dependencies": {
     "@trufflesuite/bigint-buffer": "^1.1.10",
     "bencode": "^4.0.0",
-    "cli-progress": "^3.12.0",
     "dgram": "^1.0.1",
     "electron-squirrel-startup": "^1.0.1",
     "url": "^0.11.4"

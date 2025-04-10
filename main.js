@@ -7,8 +7,10 @@ import * as torrent from "./index.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+let win = null;
+
 const createWindow = () => {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1000,
     height: 800,
     webPreferences: {
@@ -40,9 +42,16 @@ ipcMain.handle("choose-file", async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle("start-torrent", (event, filePath, destPath) => {
+ipcMain.on("start-torrent", (event, filePath, destPath) => {
   const openedTorrent = torrent.open(filePath);
-  torrent.download(openedTorrent, openedTorrent.info.name, destPath);
+  torrent.download(
+    openedTorrent,
+    openedTorrent.info.name,
+    destPath,
+    (progress) => {
+      win.webContents.send('torrent-progress', progress)
+    }
+  );
 });
 
 ipcMain.handle("choose-directory", async () => {
