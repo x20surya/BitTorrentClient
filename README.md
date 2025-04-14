@@ -2,6 +2,8 @@
 
 This is a BitTorrent client made in Node.js
 
+![Screenshot](assets/image.png)
+
 ## Current Features
 
 - **Can download multiple file torrents** 
